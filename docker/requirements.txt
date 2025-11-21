@@ -1,0 +1,5 @@
+pandas
+numpy 
+pyspark 
+cassandra-driver 
+mysql-connector-python

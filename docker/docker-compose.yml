@@ -1,0 +1,79 @@
+services:
+
+  cassandra:
+    image: cassandra:4.1
+    container_name: cassandra_dl
+    ports:
+      - "9042:9042"
+    volumes:
+      - cassandra-data:/var/lib/cassandra
+    environment:
+      CASSANDRA_CLUSTER_NAME: "first_cluster"
+    healthcheck:
+      test: ["CMD-SHELL", "cqlsh -e 'describe keyspaces'"]
+      interval: 10s
+      retries: 5
+    networks:
+      - de_project
+
+  mysql:
+    image: mysql:8.0.44-debian
+    container_name: mysql_dwh
+    ports:
+      - "3307:3306"     
+    environment:
+      MYSQL_ROOT_PASSWORD: 123  
+    volumes:
+      - mysql-data:/var/lib/mysql   
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      retries: 5
+    networks:
+      - de_project
+
+  spark-master:
+    container_name: spark-engine
+    build:
+      context: .
+      dockerfile: spark/Dockerfile
+    image: da-spark-image
+    entrypoint: ['./entrypoint.sh', 'master']
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080"]
+      interval: 5s
+      timeout: 3s
+      retries: 3
+    volumes:
+      - ../data:/opt/spark/data
+      - ../etl:/opt/spark/etl
+      - spark-logs:/opt/spark/spark-events
+    env_file:
+      - .env
+    ports:
+      - '9090:8080'
+      - '7077:7077'
+      - '4041:4040'
+    networks:
+      - de_project
+
+  grafana:
+    image: grafana/grafana:latest  
+    container_name: grafana
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    ports:
+      - "3000:3000"
+    networks:
+      - de_project
+
+volumes:
+  cassandra-data:
+  mysql-data:
+  spark-logs:
+
+networks:
+  de_project:    # tên network bạn muốn
+    name: de_project
+    driver: bridge
