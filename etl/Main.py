@@ -172,7 +172,7 @@ class DataSync:
 
     @staticmethod
     def last_mysql_date():
-        df = mysql.read("campaign")
+        df = mysql.read("event")
         return df.select(max("updated_at")).first()[0]
 
     @staticmethod
@@ -194,7 +194,7 @@ class DataSync:
 def run_etl():
     df = cass.read("tracking")
     df = DataTransformer.transform_full(df)
-    mysql.insert("campaign", df)
+    mysql.insert("event", df)
 
 
 # ===========================================================
