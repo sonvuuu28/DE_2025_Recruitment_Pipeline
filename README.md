@@ -1,4 +1,4 @@
-# **I. Docker Preparation**
+# I. Docker Preparation
 
 ```
 docker/
@@ -11,13 +11,13 @@ docker/
 └── requirements.txt
 ```
 
-* **Mục tiêu:** Build image Spark riêng, Cassandra và MySQL dùng image từ Docker Hub.
+Mục tiêu: Build image Spark riêng, Cassandra và MySQL dùng image từ Docker Hub.
 
 ---
 
-### **1. Build Spark Image**
+## 1. Build Spark Image
 
-**Dockerfile tóm tắt:**
+Dockerfile:
 
 ```dockerfile
 FROM python:3.10-bookworm as spark-base
@@ -56,23 +56,19 @@ COPY entrypoint.sh .
 ENTRYPOINT ["./entrypoint.sh"]
 ```
 
-* **Lưu ý:**
+Lưu ý:
 
-  * Spark chạy trên Docker container, kết nối với Cassandra / MySQL từ Docker Hub.
-  * `entrypoint.sh` sẽ chạy ETL tự động khi container start.
-
----
-### **2. Build Docker Compose**
-Ok, đây là **markdown chuẩn, gọn, dễ đọc** cho file `docker-compose.yml` bạn vừa gửi:
+* Spark chạy trong container, kết nối Cassandra / MySQL từ Docker Hub.
+* `entrypoint.sh` chạy ETL tự động khi container start.
 
 ---
 
+## 2. Docker Compose Setup
+docker-compose:
 ```yaml
 services:
 
-  # -----------------------------
   # Cassandra (Data Lake)
-  # -----------------------------
   cassandra:
     image: cassandra:4.1
     container_name: cassandra_dl
@@ -89,9 +85,7 @@ services:
     networks:
       - de_project
 
-  # -----------------------------
   # MySQL (Data Warehouse)
-  # -----------------------------
   mysql:
     image: mysql:8.0.44-debian
     container_name: mysql_dwh
@@ -108,9 +102,7 @@ services:
     networks:
       - de_project
 
-  # -----------------------------
   # Spark Master
-  # -----------------------------
   spark-master:
     container_name: spark-engine
     build:
@@ -136,9 +128,7 @@ services:
     networks:
       - de_project
 
-  # -----------------------------
   # Grafana (Monitoring)
-  # -----------------------------
   grafana:
     image: grafana/grafana:latest
     container_name: grafana
@@ -150,46 +140,42 @@ services:
     networks:
       - de_project
 
-# -----------------------------
 # Volumes
-# -----------------------------
 volumes:
   cassandra-data:
   mysql-data:
   spark-logs:
 
-# -----------------------------
 # Networks
-# -----------------------------
 networks:
   de_project:
     name: de_project
     driver: bridge
 ```
 
+Giải thích:
+
+* Cassandra → Data Lake, port 9042
+* MySQL → Data Warehouse, port 3307
+* Spark Master → chạy ETL, kết nối CSV/ETL code
+* Grafana → Monitoring, port 3000
+* Volumes → lưu dữ liệu persistent
+* Network de_project → tất cả container cùng network nội bộ
+
 ---
 
-### **Giải thích**
+# 
 
-* **Cassandra** → Data Lake, port 9042
-* **MySQL** → Data Warehouse, port 3307
-* **Spark Master** → chạy ETL, kết nối với CSV / ETL code
-* **Grafana** → monitoring, port 3000
-* **Volumes** → lưu dữ liệu persistent
-* **Network de_project** → tất cả container cùng network để kết nối nội bộ
----
+# III. Server Preparation
 
-
-# **II. Server Preparation**
-
-### **1. Cài đặt VM**
+### 1. Cài đặt VM
 
 * Cài VirtualBox: [VirtualBox](https://www.virtualbox.org/wiki/Downloads)
 * Tải Ubuntu Server: [Ubuntu](https://ubuntu.com/download/server)
 
 ---
 
-### **2. Cấu hình server**
+### 2. Cấu hình server
 
 #### 2.1 Tạo máy ảo
 
@@ -202,8 +188,9 @@ networks:
 #### 2.2 Cấu hình mạng
 
 ![Config Image](image/image.png)
+
 * Settings → Network → Adapter 1 → Port Forwarding
-* Mở port SSH từ host → VM (ví dụ host port: 2222 → guest port: 22)
+* Mở port SSH host → VM (ví dụ host port 2222 → guest port 22)
 
 #### 2.3 Cài OpenSSH server
 
@@ -219,7 +206,8 @@ sudo systemctl start ssh
 ```bash
 ssh <username>@<host_ip> -p <host_port>
 ```
-![test_ssh.png](image/test_ssh.png)
+
+![test\_ssh.png](image/test_ssh.png)
 
 #### 2.4 Cài đặt hỗ trợ
 
@@ -227,5 +215,3 @@ ssh <username>@<host_ip> -p <host_port>
 sudo apt install git -y
 sudo apt install docker.io docker-compose -y
 ```
-
----
