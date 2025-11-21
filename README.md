@@ -1,20 +1,30 @@
-# Cách 1: pull rồi run container
+# Server Preparation 
 
-pull 3 tech stack từ dockerhub
+## 1. Installation
+Cài máy ảo
+[Virtual Box](https://www.virtualbox.org/wiki/Downloads)
 
-docker run -d --name cassandra -p 9042:9042 cassandra:4.2
+Cài hệ điều hành Ubuntu
+[Ubuntu](https://ubuntu.com/download/server)
 
-docker run -d --name mysql_dw `
-  -p 3307:3306 `
-  -e MYSQL_ROOT_PASSWORD=rootpass `
-  -e MYSQL_DATABASE=dw `
-  -e MYSQL_USER=dw_user `
-  -e MYSQL_PASSWORD=dw_pass `
-  mysql:latest
+## 2. Config Servers
+### 2.1 Set up máy ảo
+```html
+1. Mở VirtualBox → New
 
-docker run -d --name spark `
-  -p 8080:8080 `
-  -v D:/2025/Docker_cassandra_mysql_spark/etl:/etl `
-  spark:latest /bin/bash -c "start-master.sh"
+2. Name: Ubuntu_VM
 
+3. Type: Linux → Version: Ubuntu (64-bit)
 
+4. RAM: 2–4 GB (tùy nhu cầu)
+
+5. Hard disk: tạo mới, 20GB+
+
+6. Finish → Start VM → cài Ubuntu từ ISO
+```
+
+### 2.2 Cấu hình mạng 
+```html
+VM → Settings → Network → Adapter 1 → Port Forwarding
+```
+![Config Image](image/image.png)
