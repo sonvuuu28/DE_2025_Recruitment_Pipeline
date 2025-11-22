@@ -31,7 +31,7 @@ Dữ liệu đi từ Sources → Ingest → Data Lake (Cassandra) → ETL (Spark
 | custom_track   | Loại event: click, conversion, qualified, unqualified |
 | bid            | Giá thầu (bid) cho event |
 | campaign_id    | ID chiến dịch quảng cáo |
-| group_id       | ID nhóm (campaign hoặc job) |
+| group_id       | ID nhóm |
 | publisher_id   | ID nhà xuất bản / publisher |
 
 
@@ -40,6 +40,26 @@ Dữ liệu đi từ Sources → Ingest → Data Lake (Cassandra) → ETL (Spark
 * Dashboard phân tích trên Grafana
 * Pipeline ETL micro-batch tự động
 * Tất cả chạy trên single VM VirtualBox
+* Flat Table output:
+
+| Column Name    | Description |
+|----------------|-------------|
+| id             | ID bản ghi tự sinh (unique) |
+| job_id         | ID công việc liên quan đến event |
+| dates          | Ngày xảy ra event (YYYY-MM-DD) |
+| hours          | Giờ trong ngày khi event xảy ra (0-23) |
+| company_id     | ID công ty sở hữu job/campaign |
+| group_id       | ID nhóm liên quan đến job/campaign |
+| campaign_id    | ID chiến dịch quảng cáo |
+| publisher_id   | ID nhà xuất bản / publisher |
+| click          | Số lần click |
+| conversion     | Số lần chuyển đổi |
+| qualified      | Số lượt qualified |
+| unqualified    | Số lượt unqualified |
+| bid_set        | Giá thầu trung bình |
+| spend_hour     | Tổng chi tiêu theo giờ |
+| sources        | Nguồn dữ liệu (ví dụ: Cassandra) |
+| updated_at     | Thời điểm bản ghi được cập nhật |
 
 ---
 ### 4. Demo
