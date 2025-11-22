@@ -18,7 +18,8 @@ spark = (
     SparkSession.builder.config(
         "spark.jars.packages", "com.datastax.spark:spark-cassandra-connector_2.12:3.1.0"
     )
-    .config("spark.cassandra.connection.host", "172.18.0.5")
+    .config("spark.cassandra.connection.host", "cassandra_dl")
+    .config("spark.cassandra.connection.port", "9042")
     .config("spark.driver.extraClassPath", MYSQL_JAR)
     .config("spark.executor.extraClassPath", MYSQL_JAR)
     .getOrCreate()

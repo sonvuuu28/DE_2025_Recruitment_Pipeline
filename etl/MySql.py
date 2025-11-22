@@ -1,7 +1,8 @@
 class MySql:
     def __init__(self, spark):
         self.spark = spark
-        self.url = "jdbc:mysql://172.18.0.3:3307/DE_2025_data_warehouse"
+        # self.url = "jdbc:mysql://localhost:3307/DE_2025_data_warehouse"
+        self.url = "jdbc:mysql://mysql_dwh:3306/DE_2025_data_warehouse"
         self.user = "root"
         self.password = "123"
         self.driver = "com.mysql.cj.jdbc.Driver"
@@ -19,8 +20,17 @@ class MySql:
         return df
 
     def insert(self, table, df):
-        df.write.format("jdbc").option("url", self.url).option("dbtable", table).option(
-            "user", self.user
-        ).option("password", self.password).option("driver", self.driver).mode(
-            "overwrite"
-        ).save()
+        try:
+            df.write.format("jdbc").option("url", self.url).option(
+                "dbtable", table
+            ).option("user", self.user).option("password", self.password).option(
+                "driver", self.driver
+            ).mode(
+                "overwrite"
+            ).save()
+
+            return True
+
+        except Exception as e:
+            print("Insert random error:", e)
+            return False
