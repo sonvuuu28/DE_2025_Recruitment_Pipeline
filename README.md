@@ -1,39 +1,65 @@
-DE project: Recruitment Pipeline
+# **DE project: Recruitment Pipeline**
 
-[![Python](https://img.shields.io/badge/python-3.10-blue)](https://www.python.org/)  
-[![Spark](https://img.shields.io/badge/spark-3.5.6-orange)](https://spark.apache.org/)  
-[![Cassandra](https://img.shields.io/badge/Cassandra-latest-red)](https://cassandra.apache.org/)  
-[![MySQL](https://img.shields.io/badge/MySQL-latest-lightgrey)](https://www.mysql.com/)  
-[![Grafana](https://img.shields.io/badge/Grafana-latest-orange)](https://grafana.com/)  
-[![Docker](https://img.shields.io/badge/Docker-latest-blue)](https://www.docker.com/)  
+[![Python](https://img.shields.io/badge/python-3.10-blue)](https://www.python.org/)
+[![Spark](https://img.shields.io/badge/spark-3.5.6-orange)](https://spark.apache.org/)
+[![Cassandra](https://img.shields.io/badge/Cassandra-latest-red)](https://cassandra.apache.org/)
+[![MySQL](https://img.shields.io/badge/MySQL-latest-lightgrey)](https://www.mysql.com/)
+[![Grafana](https://img.shields.io/badge/Grafana-latest-orange)](https://grafana.com/) 
+[![Docker](https://img.shields.io/badge/Docker-latest-blue)](https://www.docker.com/) 
 [![GitHub](https://img.shields.io/badge/GitHub-latest-black)](https://github.com/)
-
-[![Python](https://img.shields.io/badge/python-3.10-blue)](https://www.python.org/) 
-[![Spark](https://img.shields.io/badge/spark-3.5.6-orange)](https://spark.apache.org/) 
-[![Streamlit](https://img.shields.io/badge/streamlit-latest-green)](https://streamlit.io/) 
-[![PowerBI](https://img.shields.io/badge/PowerBI-latest-yellow)](https://powerbi.microsoft.com/) 
-[![MySQL](https://img.shields.io/badge/MySQL-latest-lightgrey)](https://www.mysql.com/) 
-[![LM Studio](https://img.shields.io/badge/LM%20Studio-latest-purple)](https://lmstudio.io/)
-
+---
 # Tổng quan dự án
 ### 1. Mục tiêu dự án
 Xây pipeline Micro-Batch ETL near-real-time từ CSV tĩnh và API giả lập CDC: lưu dữ liệu thô vào Cassandra(Data Lake), transform bằng Spark + Python, load vào MySQL(Data Warehouse) và hiển thị trên Grafana.  Toàn bộ hệ thống được container hóa bằng Docker và triển khai trên một máy ảo VirtualBox, kèm CI/CD trên GitHub.
+
+---
 ### 2. High Level Architecture
-Dữ liệu đi từ Sources → Ingest → Data Lake (Cassandra) → ETL (Spark) → Data Warehouse (MySQL) → Consumers (Grafana / SQL / Jupyter). Tất cả components đều được đóng gói bằng docker và chạy trong VM đểdemo.
+Dữ liệu đi từ Sources → Ingest → Data Lake (Cassandra) → ETL (Spark) → Data Warehouse (MySQL) → Consumers (Grafana / SQL). Tất cả components đều được đóng gói bằng docker và chạy trong VM.
 ![alt text](image/hla.png)
 
-### 3. Input/Output
-Input Data: CSV, API python
-Output: DashBoard (Grafana), và 1 pipeline tự động ETL, tất cả chạy hoàn toàn ở 1 máy ảo
-
-Grafana:
-![alt text](image/grafana.png)
 ---
+### 3. Input/Output
+**Input**
 
-Automatically ETL:
+* File CSV mẫu
+* API Python sinh sự kiện (giả lập CDC)
+
+**Output**
+
+* Dashboard phân tích trên Grafana
+* Pipeline ETL micro-batch tự động
+* Tất cả chạy trên single VM VirtualBox
+
+---
+### 4. Demo
+`ETL chạy tự động liên tục`
+
 ![ETL Demo](image/demo_etl.gif)
 
-Server:
+---
+`Grafana Dashboard`
+
+![alt text](image/grafana.png)
+
+---
+### Kết quả trên server
+
+`Cassandra Data Lake lưu dữ liệu thô`
+
+![alt text](image/output_cassandra.png)
+
+---
+
+`MySQL Data Warehouse lưu dữ liệu đã transform`
+
+![alt text](image/output_mysql.png)
+
+---
+
+`Spark Engine xử lý streaming / micro-batch liên tục`
+
+![alt text](image/demo_server.gif)
+
 
 
 ----
@@ -216,7 +242,7 @@ Mục tiêu:
 - Đưa dữ liệu vào MySQL (Data Warehouse)
 - Tạo các bản ghi liên tục tự động đưa vào Datalake (📄 generate_data_automatically.ipynb)
 
-### 1. Code
+### 1. Main
 ```python
 import os
 from uuid import UUID
@@ -228,134 +254,130 @@ from cassandra.util import datetime_from_uuid1
 from Cassandra import Cassandra
 from MySql import MySql
 
-# ======================================================================
-#                         SPARK CONFIGURATION
-# ======================================================================
+# ===========================================================
+# SPARK CONFIG — kết nối Cassandra + MySQL cho Spark
+# ===========================================================
 
-# Đường dẫn MySQL Driver (để Spark có thể ghi vào MySQL)
 MYSQL_JAR = os.path.abspath("../driver/mysql-connector-j-8.0.33.jar")
 
-# Tạo SparkSession, kèm theo kết nối Cassandra + MySQL
 spark = (
     SparkSession.builder.config(
-        # Connector để Spark đọc Cassandra
         "spark.jars.packages", "com.datastax.spark:spark-cassandra-connector_2.12:3.1.0"
     )
-    # Add MySQL driver
+    .config("spark.cassandra.connection.host", "cassandra_dl")
+    .config("spark.cassandra.connection.port", "9042")
     .config("spark.driver.extraClassPath", MYSQL_JAR)
     .config("spark.executor.extraClassPath", MYSQL_JAR)
     .getOrCreate()
 )
 
-# Tạo instance DB để tương tác dễ dàng
+# DB wrappers
 cass = Cassandra(spark)
 mysql = MySql(spark)
 
-# ======================================================================
-#                                UDF
-# ======================================================================
-# UDF này dùng để lấy timestamp thật từ UUID v1 trong Cassandra
-# Cassandra lưu thời gian trong uuid1 → phải tự convert
+# ===========================================================
+# UDF — chuyển UUID v1 → timestamp
+# ===========================================================
+
 @udf(returnType=StringType())
 def extract_timestamp_from_uuid(uuid_str):
     try:
         u = UUID(uuid_str)
-        dt = datetime_from_uuid1(u)  # Trích timestamp từ UUID
+        dt = datetime_from_uuid1(u)
         return dt.strftime("%Y-%m-%d %H:%M:%S")
     except:
         return None
 
 
-# ======================================================================
-#                         DATA TRANSFORM PIPELINE
-# ======================================================================
+# ===========================================================
+# Utility đọc file CSV
+# ===========================================================
+
+def spark_read_file(path):
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    return spark.read.csv(os.path.join(base_dir, path), header=True)
+
+
+# ===========================================================
+# DATA TRANSFORM PIPELINE — nơi xử lý chính
+# ===========================================================
+
 class DataTransformer:
 
-    # Chỉ nhận các event hợp lệ
+    # Các event hợp lệ để pivot
     valid_events = ["click", "conversion", "qualified", "unqualified"]
 
-    # -------------------------------------------------------------
-    # 1️⃣ Tiền xử lý dữ liệu
-    # -------------------------------------------------------------
     @staticmethod
     def preprocess(df):
-        # Chuyển create_time (UUID) → timestamp
+        # Convert UUID → timestamp
         df = df.withColumn("system_ts", extract_timestamp_from_uuid(col("create_time")))
         df = df.withColumn("system_ts", to_timestamp("system_ts"))
 
-        # Chọn cột cần thiết — loại bỏ cột rác
-        return df.select(
-            "create_time", "system_ts", "job_id", "custom_track", "bid",
-            "campaign_id", "group_id", "publisher_id"
+        # Chọn cột cần thiết + lọc null
+        df = df.select(
+            "create_time", "system_ts", "job_id", "custom_track",
+            "bid", "campaign_id", "group_id", "publisher_id"
         ).filter("job_id IS NOT NULL AND custom_track IS NOT NULL")
 
-    # -------------------------------------------------------------
-    # 2️⃣ Tổng hợp dữ liệu theo Job / ngày / giờ / campaign
-    # -------------------------------------------------------------
+        return df
+
     @staticmethod
     def aggregate(df):
-        # Chỉ giữ event hợp lệ
+        # Giữ event hợp lệ
         df = df.filter(col("custom_track").isin(DataTransformer.valid_events))
 
-        # Extract ngày & giờ
+        # Tách ngày & giờ
         df = df.withColumn("dates", to_date("system_ts"))
         df = df.withColumn("hours", hour("system_ts"))
 
-        # Pivot để đếm mỗi loại event theo giờ
+        # Pivot event → đếm số lần click / conversion / ...
         pivot_df = (
-            df.groupBy("job_id", "dates", "hours", "publisher_id", "campaign_id", "group_id")
+            df.groupBy("job_id", "dates", "hours",
+                       "publisher_id", "campaign_id", "group_id")
             .pivot("custom_track", DataTransformer.valid_events)
             .agg(count("*").alias("count"))
         )
 
-        # Đổi tên cột click_count → click
+        # Rename: click_count → click
         for e in DataTransformer.valid_events:
             pivot_df = pivot_df.withColumnRenamed(f"{e}_count", e)
 
-        # Tính spend theo giờ + bid trung bình
+        # Tính spend + bid trung bình theo job/group
         metric_df = df.groupBy("job_id", "publisher_id", "campaign_id", "group_id").agg(
             round(sum("bid"), 2).alias("spend_hour"),
             round(avg("bid"), 2).alias("bid_set"),
         )
 
-        # JOIN lại để có bảng hoàn chỉnh
-        return pivot_df.join(
-            metric_df, ["job_id", "publisher_id", "campaign_id", "group_id"], "left"
-        )
+        # Join pivot + metrics
+        return pivot_df.join(metric_df,
+                             ["job_id", "publisher_id", "campaign_id", "group_id"],
+                             "left")
 
-    # -------------------------------------------------------------
-    # 3️⃣ Điền các cột null thành 0 để dễ lưu vào MySQL
-    # -------------------------------------------------------------
     @staticmethod
     def fill_null(df):
-        return df.fillna({
-            "click": 0,
-            "conversion": 0,
-            "qualified": 0,
-            "unqualified": 0,
-            "spend_hour": 0,
-            "bid_set": 0,
-        })
+        # Điền 0 cho tất cả metric
+        fill_values = {
+            "click": 0, "conversion": 0, "qualified": 0,
+            "unqualified": 0, "spend_hour": 0, "bid_set": 0,
+        }
+        return df.fillna(fill_values)
 
-    # -------------------------------------------------------------
-    # 4️⃣ Tạo PK + timestamp cập nhật
-    # -------------------------------------------------------------
     @staticmethod
     def post_process(df):
+        # Primary key tự sinh
         df = df.withColumn("id", monotonically_increasing_id())
+
+        # Timestamp cập nhật
         df = df.withColumn("updated_at", current_timestamp())
 
-        # Final schema cho bảng trong MySQL
+        # Chọn và sắp xếp cột
         return df.select(
-            "id", "job_id", "dates", "hours", "company_id", "group_id",
-            "campaign_id", "publisher_id", "click", "conversion",
-            "qualified", "unqualified", "bid_set", "spend_hour",
-            "sources", "updated_at"
+            "id", "job_id", "dates", "hours",
+            "company_id", "group_id", "campaign_id", "publisher_id",
+            "click", "conversion", "qualified", "unqualified",
+            "bid_set", "spend_hour", "sources", "updated_at",
         )
 
-    # -------------------------------------------------------------
-    # 5️⃣ Pipeline đầy đủ
-    # -------------------------------------------------------------
     @staticmethod
     def transform_full(df):
         df = DataTransformer.preprocess(df)
@@ -363,51 +385,53 @@ class DataTransformer:
         df = df.withColumn("sources", lit("Cassandra"))
         df = DataTransformer.fill_null(df)
 
-        # Lấy thêm thông tin công ty từ bảng job
+        # Join thêm company từ MySQL
         job_df = mysql.read("job").select(col("id").alias("job_id"), "company_id")
         df = df.join(job_df, "job_id", "left")
 
         return DataTransformer.post_process(df)
 
 
-# ======================================================================
-#                     CHECK SYNC MYSQL <-> CASSANDRA
-# ======================================================================
+# ===========================================================
+# SYNC CHECK — kiểm tra có dữ liệu mới để ETL tiếp không
+# ===========================================================
+
 class DataSync:
 
-    # Lấy timestamp update cuối cùng trong MySQL
     @staticmethod
     def last_mysql_date():
-        df = mysql.read("campaign")
+        df = mysql.read("event")
         return df.select(max("updated_at")).first()[0]
 
-    # Lấy timestamp mới nhất từ Cassandra
     @staticmethod
     def last_cassandra_date():
         df = cass.read("tracking")
+
+        # Convert create_time trong Cassandra → timestamp VN timezone
         df = df.withColumn("create_time", extract_timestamp_from_uuid("create_time"))
         df = df.withColumn("create_time", to_timestamp("create_time"))
-        df = df.withColumn(
-            "create_time",
-            from_utc_timestamp("create_time", "Asia/Ho_Chi_Minh")
-        )
+        df = df.withColumn("create_time",
+            from_utc_timestamp("create_time", "Asia/Ho_Chi_Minh"))
+
         return df.select(max("create_time")).first()[0]
 
 
-# ======================================================================
-#                             MAIN ETL
-# ======================================================================
+# ===========================================================
+# MAIN ETL — chạy toàn pipeline
+# ===========================================================
+
 def run_etl():
     df = cass.read("tracking")
     df = DataTransformer.transform_full(df)
-    mysql.insert("campaign", df)
+    mysql.insert("event", df)
 
 
-# ======================================================================
-#                           ENTRY POINT
-# ======================================================================
+# ===========================================================
+# ENTRY POINT — chạy lần đầu và sync liên tục
+# ===========================================================
+
 if __name__ == "__main__":
-    # Load dữ liệu mẫu vào DB
+    # Load dữ liệu thô ban đầu
     print("Insert Cassandra")
     cass.insert("tracking", spark_read_file("../data/cassandra/tracking.csv"))
 
@@ -417,7 +441,7 @@ if __name__ == "__main__":
     # Chạy ETL lần đầu
     run_etl()
 
-    # Worker chạy liên tục → chỉ ETL khi có dữ liệu mới
+    # Loop sync — nếu Cassandra có dữ liệu mới → ETL lại
     while True:
         if DataSync.last_mysql_date() < DataSync.last_cassandra_date():
             run_etl()
@@ -425,9 +449,10 @@ if __name__ == "__main__":
 ### 2. Kết quả đạt được 
 ![ETL Demo](image/demo_etl.gif)
 
-Nhận xét: 
+**Nhận xét:**
 - Dữ liệu được xử lý tự động khi có bản ghi mới được đưa vào Datalake: Micro-Batch ETL
 
+---
 # III. Visualization (Grafana)
 ### 1. Config Mysql
 ```
@@ -439,7 +464,7 @@ Grafana → Connections → Data Sources → mysql
 ### 2. Kết quả đạt được
 ![alt text](image/grafana.png)
 
-
+---
 # IV. Server Preparation
 
 ### 1. Cài đặt VM
@@ -483,7 +508,7 @@ ssh <username>@<host_ip> -p <host_port>
 
 ![test\_ssh.png](image/test_ssh.png)
 
-#### 2.4 Cài đặt hỗ trợ
+#### 2.4 Cài đặt thêm các gói hỗ trợ
 
 Trong bước này, chúng ta sẽ cài đặt những công cụ cần thiết để chạy project: **Git**, **Docker Engine**, và **Docker Compose v2**.
 
@@ -530,6 +555,7 @@ sudo apt update
 sudo apt install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
 ```
 
+---
 # V. Deployment & CI/CD Pipeline
 Mục đích: kéo code từ github về server và chạy ở server
 
@@ -543,4 +569,3 @@ sudo docker-compose up -d
 ```
 
 ![alt text](image/ketqua_docker.png)
-### 2. Kết quả đạt được
