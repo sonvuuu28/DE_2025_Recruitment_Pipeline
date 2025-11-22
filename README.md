@@ -1,7 +1,35 @@
-# Tổng quan dự án
-### 1. High level Architecture
-![alt text](image-2.png)
+DE project: Recruitment Pipeline
 
+[![Python](https://img.shields.io/badge/python-3.10-blue)](https://www.python.org/)  
+[![Spark](https://img.shields.io/badge/spark-3.5.6-orange)](https://spark.apache.org/)  
+[![Cassandra](https://img.shields.io/badge/Cassandra-latest-red)](https://cassandra.apache.org/)  
+[![MySQL](https://img.shields.io/badge/MySQL-latest-lightgrey)](https://www.mysql.com/)  
+[![Grafana](https://img.shields.io/badge/Grafana-latest-orange)](https://grafana.com/)  
+[![Docker](https://img.shields.io/badge/Docker-latest-blue)](https://www.docker.com/)  
+[![GitHub](https://img.shields.io/badge/GitHub-latest-black)](https://github.com/)
+
+# Tổng quan dự án
+### 1. Mục tiêu dự án
+Xây pipeline Micro-Batch ETL near-real-time từ CSV tĩnh và API giả lập CDC: lưu dữ liệu thô vào Cassandra(Data Lake), transform bằng Spark + Python, load vào MySQL(Data Warehouse) và hiển thị trên Grafana.  Toàn bộ hệ thống được container hóa bằng Docker và triển khai trên một máy ảo VirtualBox, kèm CI/CD trên GitHub.
+### 2. High Level Architecture
+Dữ liệu đi từ Sources → Ingest → Data Lake (Cassandra) → ETL (Spark) → Data Warehouse (MySQL) → Consumers (Grafana / SQL / Jupyter). Tất cả components đều được đóng gói bằng docker và chạy trong VM đểdemo.
+![alt text](image/hla.png)
+
+### 3. Input/Output
+Input Data: CSV, API python
+Output: DashBoard (Grafana), và 1 pipeline tự động ETL, tất cả chạy hoàn toàn ở 1 máy ảo
+
+Grafana:
+![alt text](image/grafana.png)
+---
+
+Automatically ETL:
+![ETL Demo](image/demo_etl.gif)
+
+Server:
+
+
+----
 # I. Docker Preparation
 
 ```
@@ -393,7 +421,7 @@ if __name__ == "__main__":
 Nhận xét: 
 - Dữ liệu được xử lý tự động khi có bản ghi mới được đưa vào Datalake: Micro-Batch ETL
 
-# III. Visualize (Grafana)
+# III. Visualization (Grafana)
 ### 1. Config Mysql
 ```
 Grafana → Connections → Data Sources → mysql 
@@ -402,7 +430,7 @@ Grafana → Connections → Data Sources → mysql
 ![Grafana Config](image/grafana_config.png)
 
 ### 2. Kết quả đạt được
-![alt text](image.png)
+![alt text](image/grafana.png)
 
 
 # IV. Server Preparation
@@ -479,4 +507,4 @@ sudo docker-compose up -d
 
 
 
-![alt text](image-1.png)
+![alt text](image/docker_server.png)
