@@ -21,8 +21,19 @@ Dữ liệu đi từ Sources → Ingest → Data Lake (Cassandra) → ETL (Spark
 ### 3. Input/Output
 **Input**
 
-* File CSV mẫu
-* API Python sinh sự kiện (giả lập CDC)
+* File CSV tracking.
+* API Python sinh sự kiện (giả lập CDC). Sanh ra bản ghi tương ứng metadata của tracking.
+
+| Column Name    | Description |
+|----------------|-------------|
+| create_time    | Thời điểm event được tạo (UUID v1) |
+| job_id         | ID công việc liên quan đến event |
+| custom_track   | Loại event: click, conversion, qualified, unqualified |
+| bid            | Giá thầu (bid) cho event |
+| campaign_id    | ID chiến dịch quảng cáo |
+| group_id       | ID nhóm (campaign hoặc job) |
+| publisher_id   | ID nhà xuất bản / publisher |
+
 
 **Output**
 
