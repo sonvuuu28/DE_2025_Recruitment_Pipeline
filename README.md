@@ -87,7 +87,7 @@ Dữ liệu đi từ Sources → Ingest → Data Lake (Cassandra) → ETL (Spark
 
 ---
 
-`Spark Engine xử lý streaming / micro-batch liên tục`
+`Spark Engine xử lý micro-batch liên tục`
 
 ![alt text](image/demo_server.gif)
 
