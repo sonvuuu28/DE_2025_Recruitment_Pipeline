@@ -544,14 +544,3 @@ sudo docker-compose up -d
 
 ![alt text](image/ketqua_docker.png)
 ### 2. Kết quả đạt được
-MySQL:
-
-![alt text](image.png)
-
-Cassandra:
-
-![alt text](image-1.png)
-
-Pyspark:
-
-![alt text](image-2.png)
