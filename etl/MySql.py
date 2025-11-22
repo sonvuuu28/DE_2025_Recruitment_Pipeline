@@ -1,7 +1,7 @@
 class MySql:
     def __init__(self, spark):
         self.spark = spark
-        self.url = "jdbc:mysql://localhost:3307/DE_2025_data_warehouse"
+        self.url = "jdbc:mysql://172.18.0.3:3307/DE_2025_data_warehouse"
         self.user = "root"
         self.password = "123"
         self.driver = "com.mysql.cj.jdbc.Driver"

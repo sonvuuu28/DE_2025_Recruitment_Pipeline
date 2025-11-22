@@ -8,6 +8,13 @@ DE project: Recruitment Pipeline
 [![Docker](https://img.shields.io/badge/Docker-latest-blue)](https://www.docker.com/)  
 [![GitHub](https://img.shields.io/badge/GitHub-latest-black)](https://github.com/)
 
+[![Python](https://img.shields.io/badge/python-3.10-blue)](https://www.python.org/) 
+[![Spark](https://img.shields.io/badge/spark-3.5.6-orange)](https://spark.apache.org/) 
+[![Streamlit](https://img.shields.io/badge/streamlit-latest-green)](https://streamlit.io/) 
+[![PowerBI](https://img.shields.io/badge/PowerBI-latest-yellow)](https://powerbi.microsoft.com/) 
+[![MySQL](https://img.shields.io/badge/MySQL-latest-lightgrey)](https://www.mysql.com/) 
+[![LM Studio](https://img.shields.io/badge/LM%20Studio-latest-purple)](https://lmstudio.io/)
+
 # Tổng quan dự án
 ### 1. Mục tiêu dự án
 Xây pipeline Micro-Batch ETL near-real-time từ CSV tĩnh và API giả lập CDC: lưu dữ liệu thô vào Cassandra(Data Lake), transform bằng Spark + Python, load vào MySQL(Data Warehouse) và hiển thị trên Grafana.  Toàn bộ hệ thống được container hóa bằng Docker và triển khai trên một máy ảo VirtualBox, kèm CI/CD trên GitHub.
@@ -478,9 +485,49 @@ ssh <username>@<host_ip> -p <host_port>
 
 #### 2.4 Cài đặt hỗ trợ
 
+Trong bước này, chúng ta sẽ cài đặt những công cụ cần thiết để chạy project: **Git**, **Docker Engine**, và **Docker Compose v2**.
+
+1. Cài đặt công cụ cơ bản
+
 ```bash
-sudo apt install git -y
-sudo apt install docker.io docker-compose -y
+sudo apt update
+sudo apt install -y git ca-certificates curl gnupg
+```
+
+**Giải thích:**
+
+* `git`: dùng để clone mã nguồn từ GitHub
+* `curl`: dùng để tải file từ internet
+* `gnupg`: dùng để xác thực chữ ký GPG
+* `ca-certificates`: đảm bảo kết nối HTTPS an toàn
+
+2. Thêm Docker GPG Key
+
+```bash
+sudo install -m 0755 -d /etc/apt/keyrings
+curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --batch --yes --dearmor -o /etc/apt/keyrings/docker.gpg
+sudo chmod a+r /etc/apt/keyrings/docker.gpg
+```
+
+**Ghi chú:**
+
+* Docker yêu cầu **key GPG** để đảm bảo package tải về là thật, không bị sửa đổi.
+* File key được lưu trong `/etc/apt/keyrings` (chuẩn mới của Ubuntu).
+
+3. Thêm Docker repository vào hệ thống
+
+```bash
+echo \
+  "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu \
+  $(. /etc/os-release && echo $VERSION_CODENAME) stable" | \
+  sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+```
+
+4. Cài Docker Engine + Docker Compose v2
+
+```bash
+sudo apt update
+sudo apt install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
 ```
 
 # V. Deployment & CI/CD Pipeline
@@ -495,16 +542,16 @@ git clone https://github.com/sonvuuu28/DE_2025_Recruitment_Pipeline.git
 sudo docker-compose up -d
 ```
 
-![docker-compose up](image/docker-compose_up.png)
+![alt text](image/ketqua_docker.png)
+### 2. Kết quả đạt được
+MySQL:
 
+![alt text](image.png)
 
+Cassandra:
 
+![alt text](image-1.png)
 
+Pyspark:
 
-
-
-
-
-
-
-![alt text](image/docker_server.png)
+![alt text](image-2.png)
