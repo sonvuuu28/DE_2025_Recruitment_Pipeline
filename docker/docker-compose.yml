@@ -53,6 +53,7 @@ services:
       - ../data:/opt/spark/data
       - ../etl:/opt/spark/etl
       - spark-logs:/opt/spark/spark-events
+      - ../driver:/opt/spark/driver
     env_file:
       - .env
     ports:
