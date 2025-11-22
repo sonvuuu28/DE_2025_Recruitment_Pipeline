@@ -39,6 +39,11 @@ services:
       dockerfile: spark/Dockerfile
     image: da-spark-image
     entrypoint: ['./entrypoint.sh', 'master']
+    depends_on:
+      mysql:
+        condition: service_healthy
+      cassandra:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080"]
       interval: 5s
