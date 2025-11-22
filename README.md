@@ -1,3 +1,7 @@
+# Tổng quan dự án
+### 1. High level Architecture
+![alt text](image-2.png)
+
 # I. Docker Preparation
 
 ```
@@ -189,148 +193,134 @@ from cassandra.util import datetime_from_uuid1
 from Cassandra import Cassandra
 from MySql import MySql
 
-# ===========================================================
-# SPARK CONFIG
-# ===========================================================
+# ======================================================================
+#                         SPARK CONFIGURATION
+# ======================================================================
 
+# Đường dẫn MySQL Driver (để Spark có thể ghi vào MySQL)
 MYSQL_JAR = os.path.abspath("../driver/mysql-connector-j-8.0.33.jar")
 
+# Tạo SparkSession, kèm theo kết nối Cassandra + MySQL
 spark = (
     SparkSession.builder.config(
+        # Connector để Spark đọc Cassandra
         "spark.jars.packages", "com.datastax.spark:spark-cassandra-connector_2.12:3.1.0"
     )
+    # Add MySQL driver
     .config("spark.driver.extraClassPath", MYSQL_JAR)
     .config("spark.executor.extraClassPath", MYSQL_JAR)
     .getOrCreate()
 )
 
-# DB Instances
+# Tạo instance DB để tương tác dễ dàng
 cass = Cassandra(spark)
 mysql = MySql(spark)
 
-# ===========================================================
-#      UDF
-# ===========================================================
-
-
+# ======================================================================
+#                                UDF
+# ======================================================================
+# UDF này dùng để lấy timestamp thật từ UUID v1 trong Cassandra
+# Cassandra lưu thời gian trong uuid1 → phải tự convert
 @udf(returnType=StringType())
 def extract_timestamp_from_uuid(uuid_str):
     try:
         u = UUID(uuid_str)
-        dt = datetime_from_uuid1(u)
+        dt = datetime_from_uuid1(u)  # Trích timestamp từ UUID
         return dt.strftime("%Y-%m-%d %H:%M:%S")
     except:
         return None
 
 
-# ===========================================================
-#      UTILITY READER
-# ===========================================================
-
-
-def spark_read_file(path):
-    base_dir = os.path.dirname(os.path.abspath(__file__))
-    return spark.read.csv(os.path.join(base_dir, path), header=True)
-
-
-# ===========================================================
-#              DATA TRANSFORM PIPELINE
-# ===========================================================
-
-
+# ======================================================================
+#                         DATA TRANSFORM PIPELINE
+# ======================================================================
 class DataTransformer:
+
+    # Chỉ nhận các event hợp lệ
     valid_events = ["click", "conversion", "qualified", "unqualified"]
 
+    # -------------------------------------------------------------
+    # 1️⃣ Tiền xử lý dữ liệu
+    # -------------------------------------------------------------
     @staticmethod
     def preprocess(df):
-        # Get timestamp from uuid
+        # Chuyển create_time (UUID) → timestamp
         df = df.withColumn("system_ts", extract_timestamp_from_uuid(col("create_time")))
-        df = df.withColumn(
-            "system_ts", to_timestamp("system_ts", "yyyy-MM-dd HH:mm:ss")
-        )
+        df = df.withColumn("system_ts", to_timestamp("system_ts"))
 
-        # Select useful rows and cols
-        df = df.select(
-            "create_time",
-            "system_ts",
-            "job_id",
-            "custom_track",
-            "bid",
-            "campaign_id",
-            "group_id",
-            "publisher_id",
+        # Chọn cột cần thiết — loại bỏ cột rác
+        return df.select(
+            "create_time", "system_ts", "job_id", "custom_track", "bid",
+            "campaign_id", "group_id", "publisher_id"
         ).filter("job_id IS NOT NULL AND custom_track IS NOT NULL")
 
-        return df
-
+    # -------------------------------------------------------------
+    # 2️⃣ Tổng hợp dữ liệu theo Job / ngày / giờ / campaign
+    # -------------------------------------------------------------
     @staticmethod
     def aggregate(df):
+        # Chỉ giữ event hợp lệ
         df = df.filter(col("custom_track").isin(DataTransformer.valid_events))
 
-        # Split dates and hours from timestamp
+        # Extract ngày & giờ
         df = df.withColumn("dates", to_date("system_ts"))
         df = df.withColumn("hours", hour("system_ts"))
 
+        # Pivot để đếm mỗi loại event theo giờ
         pivot_df = (
-            df.groupBy(
-                "job_id", "dates", "hours", "publisher_id", "campaign_id", "group_id"
-            )
+            df.groupBy("job_id", "dates", "hours", "publisher_id", "campaign_id", "group_id")
             .pivot("custom_track", DataTransformer.valid_events)
             .agg(count("*").alias("count"))
         )
 
-        # Rename {event}_count → event
+        # Đổi tên cột click_count → click
         for e in DataTransformer.valid_events:
             pivot_df = pivot_df.withColumnRenamed(f"{e}_count", e)
 
-        # Spend & bid
+        # Tính spend theo giờ + bid trung bình
         metric_df = df.groupBy("job_id", "publisher_id", "campaign_id", "group_id").agg(
             round(sum("bid"), 2).alias("spend_hour"),
             round(avg("bid"), 2).alias("bid_set"),
         )
 
+        # JOIN lại để có bảng hoàn chỉnh
         return pivot_df.join(
             metric_df, ["job_id", "publisher_id", "campaign_id", "group_id"], "left"
         )
 
+    # -------------------------------------------------------------
+    # 3️⃣ Điền các cột null thành 0 để dễ lưu vào MySQL
+    # -------------------------------------------------------------
     @staticmethod
     def fill_null(df):
-        fill_values = {
+        return df.fillna({
             "click": 0,
             "conversion": 0,
             "qualified": 0,
             "unqualified": 0,
             "spend_hour": 0,
             "bid_set": 0,
-        }
-        return df.fillna(fill_values)
+        })
 
+    # -------------------------------------------------------------
+    # 4️⃣ Tạo PK + timestamp cập nhật
+    # -------------------------------------------------------------
     @staticmethod
     def post_process(df):
-        # Add Primary Key
         df = df.withColumn("id", monotonically_increasing_id())
-
-        # Mark update dates
         df = df.withColumn("updated_at", current_timestamp())
+
+        # Final schema cho bảng trong MySQL
         return df.select(
-            "id",
-            "job_id",
-            "dates",
-            "hours",
-            "company_id",
-            "group_id",
-            "campaign_id",
-            "publisher_id",
-            "click",
-            "conversion",
-            "qualified",
-            "unqualified",
-            "bid_set",
-            "spend_hour",
-            "sources",
-            "updated_at",
+            "id", "job_id", "dates", "hours", "company_id", "group_id",
+            "campaign_id", "publisher_id", "click", "conversion",
+            "qualified", "unqualified", "bid_set", "spend_hour",
+            "sources", "updated_at"
         )
 
+    # -------------------------------------------------------------
+    # 5️⃣ Pipeline đầy đủ
+    # -------------------------------------------------------------
     @staticmethod
     def transform_full(df):
         df = DataTransformer.preprocess(df)
@@ -338,62 +328,61 @@ class DataTransformer:
         df = df.withColumn("sources", lit("Cassandra"))
         df = DataTransformer.fill_null(df)
 
+        # Lấy thêm thông tin công ty từ bảng job
         job_df = mysql.read("job").select(col("id").alias("job_id"), "company_id")
         df = df.join(job_df, "job_id", "left")
 
         return DataTransformer.post_process(df)
 
 
-# ===========================================================
-#              SYNC CHECK BETWEEN MYSQL & CASS
-# ===========================================================
-
-
+# ======================================================================
+#                     CHECK SYNC MYSQL <-> CASSANDRA
+# ======================================================================
 class DataSync:
 
+    # Lấy timestamp update cuối cùng trong MySQL
     @staticmethod
     def last_mysql_date():
         df = mysql.read("campaign")
         return df.select(max("updated_at")).first()[0]
 
+    # Lấy timestamp mới nhất từ Cassandra
     @staticmethod
     def last_cassandra_date():
         df = cass.read("tracking")
         df = df.withColumn("create_time", extract_timestamp_from_uuid("create_time"))
         df = df.withColumn("create_time", to_timestamp("create_time"))
         df = df.withColumn(
-            "create_time", from_utc_timestamp("create_time", "Asia/Ho_Chi_Minh")
+            "create_time",
+            from_utc_timestamp("create_time", "Asia/Ho_Chi_Minh")
         )
         return df.select(max("create_time")).first()[0]
 
 
-# ===========================================================
-#                       MAIN ETL
-# ===========================================================
-
-
+# ======================================================================
+#                             MAIN ETL
+# ======================================================================
 def run_etl():
     df = cass.read("tracking")
     df = DataTransformer.transform_full(df)
     mysql.insert("campaign", df)
 
 
-# ===========================================================
-#                       ENTRY POINT
-# ===========================================================
-
+# ======================================================================
+#                           ENTRY POINT
+# ======================================================================
 if __name__ == "__main__":
-    # Initial load
+    # Load dữ liệu mẫu vào DB
     print("Insert Cassandra")
     cass.insert("tracking", spark_read_file("../data/cassandra/tracking.csv"))
 
     print("Insert MySQL")
     mysql.insert("job", spark_read_file("../data/mysql/job.csv"))
 
-    # First ETL
+    # Chạy ETL lần đầu
     run_etl()
 
-    # Continuous sync
+    # Worker chạy liên tục → chỉ ETL khi có dữ liệu mới
     while True:
         if DataSync.last_mysql_date() < DataSync.last_cassandra_date():
             run_etl()
@@ -401,7 +390,22 @@ if __name__ == "__main__":
 ### 2. Kết quả đạt được 
 ![ETL Demo](image/demo_etl.gif)
 
-# III. Server Preparation
+Nhận xét: 
+- Dữ liệu được xử lý tự động khi có bản ghi mới được đưa vào Datalake: Micro-Batch ETL
+
+# III. Visualize (Grafana)
+### 1. Config Mysql
+```
+Grafana → Connections → Data Sources → mysql 
+```
+
+![Grafana Config](image/grafana_config.png)
+
+### 2. Kết quả đạt được
+![alt text](image.png)
+
+
+# IV. Server Preparation
 
 ### 1. Cài đặt VM
 
@@ -450,3 +454,29 @@ ssh <username>@<host_ip> -p <host_port>
 sudo apt install git -y
 sudo apt install docker.io docker-compose -y
 ```
+
+# V. Deployment & CI/CD Pipeline
+Mục đích: kéo code từ github về server và chạy ở server
+
+```
+git clone https://github.com/sonvuuu28/DE_2025_Recruitment_Pipeline.git
+```
+![git clone](image/gitclone.png)
+
+```
+sudo docker-compose up -d
+```
+
+![docker-compose up](image/docker-compose_up.png)
+
+
+
+
+
+
+
+
+
+
+
+![alt text](image-1.png)
