@@ -1,85 +1,103 @@
 services:
 
+  # ============================
+  # Cassandra (Data Lake Storage)
+  # ============================
   cassandra:
     image: cassandra:4.1
     container_name: cassandra_dl
     ports:
-      - "9042:9042"
+      - "9042:9042"         # Cổng truy cập Cassandra
     volumes:
-      - cassandra-data:/var/lib/cassandra
+      - cassandra-data:/var/lib/cassandra   # Lưu data bền vững
     environment:
       CASSANDRA_CLUSTER_NAME: "first_cluster"
-    healthcheck:
+    healthcheck:             # Kiểm tra Cassandra đã sẵn sàng chưa
       test: ["CMD-SHELL", "cqlsh -e 'describe keyspaces'"]
       interval: 10s
       retries: 5
     networks:
       - de_project
 
+  # ============================
+  # MySQL (Data Warehouse)
+  # ============================
   mysql:
     image: mysql:8.0.44-debian
     container_name: mysql_dwh
     ports:
-      - "3307:3306"     
+      - "3307:3306"                     # Map cổng máy host -> container
     environment:
-      MYSQL_ROOT_PASSWORD: 123  
+      MYSQL_ROOT_PASSWORD: 123
     volumes:
-      - mysql-data:/var/lib/mysql   
-    healthcheck:
+      - mysql-data:/var/lib/mysql       # Lưu database bền vững
+    healthcheck:                        # Ping kiểm tra MySQL hoạt động
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
       interval: 10s
       retries: 5
     networks:
       - de_project
 
+  # =====================================
+  # Spark Master (Engine xử lý dữ liệu)
+  # =====================================
   spark-master:
     container_name: spark-engine
     build:
       context: .
-      dockerfile: spark/Dockerfile
+      dockerfile: spark/Dockerfile     # Build image Spark tuỳ chỉnh
     image: da-spark-image
-    entrypoint: ['./entrypoint.sh', 'master']
-    depends_on:
+    entrypoint: ['./entrypoint.sh', 'master']   # Khởi chạy Master
+    depends_on:                        # Chờ MySQL & Cassandra sẵn sàng
       mysql:
         condition: service_healthy
       cassandra:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080"]
+      test: ["CMD", "curl", "-f", "http://localhost:8080"]   # Kiểm tra UI
       interval: 5s
       timeout: 3s
       retries: 3
     volumes:
-      - ../data:/opt/spark/data
-      - ../etl:/opt/spark/etl
-      - spark-logs:/opt/spark/spark-events
-      - ../driver:/opt/spark/driver
+      - ../data:/opt/spark/data         # Input data
+      - ../etl:/opt/spark/etl           # Mã ETL Python
+      - spark-logs:/opt/spark/spark-events  # Lưu event logs
+      - ../driver:/opt/spark/driver     # MySQL driver
     env_file:
-      - .env
+      - .env                            # Biến môi trường
     ports:
-      - '9090:8080'
-      - '7077:7077'
-      - '4041:4040'
+      - '9090:8080'    # Spark UI
+      - '7077:7077'    # Spark Master
+      - '4041:4040'    # Spark job UI
     networks:
       - de_project
 
+  # ============================
+  # Grafana (Visualization)
+  # ============================
   grafana:
-    image: grafana/grafana:latest  
+    image: grafana/grafana:latest
     container_name: grafana
     environment:
-      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_USER=admin       # Tài khoản đăng nhập
       - GF_SECURITY_ADMIN_PASSWORD=admin
     ports:
-      - "3000:3000"
+      - "3000:3000"                        # UI Grafana
     networks:
       - de_project
 
+# ============================
+# Persistent Volumes
+# ============================
 volumes:
   cassandra-data:
   mysql-data:
   spark-logs:
 
+# ============================
+# Network chung cho toàn hệ thống
+# ============================
 networks:
-  de_project:    # tên network bạn muốn
+  de_project:
     name: de_project
     driver: bridge

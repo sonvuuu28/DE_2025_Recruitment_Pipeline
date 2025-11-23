@@ -57,8 +57,6 @@ def spark_read_file(path):
 # ===========================================================
 #              DATA TRANSFORM PIPELINE
 # ===========================================================
-
-
 class DataTransformer:
     valid_events = ["click", "conversion", "qualified", "unqualified"]
 

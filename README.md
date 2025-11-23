@@ -32,7 +32,7 @@ Dữ liệu đi từ Sources → Ingest → Data Lake (Cassandra) → ETL (Spark
 | bid            | Giá thầu (bid) cho event |
 | campaign_id    | ID chiến dịch quảng cáo |
 | group_id       | ID nhóm |
-| publisher_id   | ID nhà xuất bản / publisher |
+| publisher_id   | ID nhà xuất bản |
 
 
 **Output**
@@ -51,7 +51,7 @@ Dữ liệu đi từ Sources → Ingest → Data Lake (Cassandra) → ETL (Spark
 | company_id     | ID công ty sở hữu job/campaign |
 | group_id       | ID nhóm liên quan đến job/campaign |
 | campaign_id    | ID chiến dịch quảng cáo |
-| publisher_id   | ID nhà xuất bản / publisher |
+| publisher_id   | ID nhà xuất bản |
 | click          | Số lần click |
 | conversion     | Số lần chuyển đổi |
 | qualified      | Số lượt qualified |
@@ -98,13 +98,14 @@ Dữ liệu đi từ Sources → Ingest → Data Lake (Cassandra) → ETL (Spark
 
 ```
 docker/
-├── config/
-│   └── spark-defaults.conf
-├── spark/
-│   └── Dockerfile
-├── docker-compose.yml
-├── entrypoint.sh
-└── requirements.txt
+├── 📁 config
+│   └── ⚙️ spark-defaults.conf
+├── 📁 spark
+│   └── 🐳 Dockerfile
+├── 📄 .env
+├── ⚙️ docker-compose.yml
+├── 📄 entrypoint.sh
+└── 📄 requirements.txt
 ```
 
 Mục tiêu: Build image Spark riêng, Cassandra và MySQL dùng image từ Docker Hub.
@@ -265,13 +266,13 @@ Giải thích:
 ├── 🐍 Cassandra.py
 ├── 🐍 Main.py
 ├── 🐍 MySql.py
-└── 📄 generate_data_automatically.ipynb
+└── 🐍 generate_data_automatically.py
 ```
 Mục tiêu:
 - Lấy dữ liệu thô từ Cassandra (Datalake)
 - Transfrom ở Main
 - Đưa dữ liệu vào MySQL (Data Warehouse)
-- Tạo các bản ghi liên tục tự động đưa vào Datalake (📄 generate_data_automatically.ipynb)
+- Tạo các bản ghi liên tục tự động đưa vào Datalake (🐍 generate_data_automatically.py)
 
 ### 1. Main
 ```python
