@@ -8,6 +8,16 @@
 [![Docker](https://img.shields.io/badge/Docker-latest-blue)](https://www.docker.com/) 
 [![GitHub](https://img.shields.io/badge/GitHub-latest-black)](https://github.com/)
 ---
+
+# Mục Lục
+
+1. [Tổng quan dự án](#tổng-quan-dự-án)
+2. [I. Docker Preparation](#i-docker-preparation)
+3. [II. ETL Pipeline](#ii-etl-pipeline)
+4. [III. Visualization (Grafana)](#iii-visualization-grafana)
+5. [IV. Server Preparation](#iv-server-preparation)
+6. [V. Deployment & CI/CD](#v-deployment--cicd)
+---
 # Tổng quan dự án
 ### 1. Mục tiêu dự án
 Xây pipeline Micro-Batch ETL near-real-time từ CSV tĩnh và API giả lập CDC: lưu dữ liệu thô vào Cassandra(Data Lake), transform bằng Spark + Python, load vào MySQL(Data Warehouse) và hiển thị trên Grafana.  Toàn bộ hệ thống được container hóa bằng Docker và triển khai trên một máy ảo VirtualBox, kèm CI/CD trên GitHub.
@@ -75,13 +85,13 @@ Dữ liệu đi từ Sources → Ingest → Data Lake (Cassandra) → ETL (Spark
 ---
 ### Kết quả trên server
 
-`Cassandra Data Lake lưu dữ liệu thô`
+`Cassandra (Data Lake) lưu dữ liệu thô`
 
 ![alt text](image/output_cassandra.png)
 
 ---
 
-`MySQL Data Warehouse lưu dữ liệu đã transform`
+`MySQL (Data Warehouse) lưu dữ liệu đã transform`
 
 ![alt text](image/output_mysql.png)
 
