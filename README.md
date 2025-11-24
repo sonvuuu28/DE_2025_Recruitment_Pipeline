@@ -473,16 +473,7 @@ def run_etl():
 # ===========================================================
 
 if __name__ == "__main__":
-    # Load dữ liệu thô ban đầu
-    print("Insert Cassandra")
-    cass.insert("tracking", spark_read_file("../data/cassandra/tracking.csv"))
-
-    print("Insert MySQL")
-    mysql.insert("job", spark_read_file("../data/mysql/job.csv"))
-
-    # Chạy ETL lần đầu
-    run_etl()
-
+    print("Start Looping")
     # Loop sync — nếu Cassandra có dữ liệu mới → ETL lại
     while True:
         if DataSync.last_mysql_date() < DataSync.last_cassandra_date():
